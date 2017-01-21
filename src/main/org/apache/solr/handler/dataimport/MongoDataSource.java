@@ -7,10 +7,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.net.UnknownHostException;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Statement;
 import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static org.apache.solr.handler.dataimport.DataImportHandlerException.SEVERE;
 import static org.apache.solr.handler.dataimport.DataImportHandlerException.wrapAndThrow;
@@ -46,24 +45,32 @@ public class MongoDataSource extends DataSource<Iterator<Map<String, Object>>>{
                                                 , "Database must be supplied");
         }
 
-        try {
-            Mongo mongo  = new Mongo( host, Integer.parseInt( port ) );
-            mongo.setReadPreference(ReadPreference.secondaryPreferred());
+        String[] hosts = host.split(",");
+        List<ServerAddress> servers = IntStream.range(0,hosts.length)
+                .mapToObj(s -> {
+                    try {
+                        return new ServerAddress(hosts[s], Integer.parseInt(port));
+                    } catch (UnknownHostException e) {
+                        throw new DataImportHandlerException( SEVERE
+                                , "Unable to connect to Mongo");
+                    }
+                })
+                .collect(Collectors.toList());
 
-            this.mongoConnection = mongo;
-            this.mongoDb = mongo.getDB( databaseName );
+        Mongo mongo  = new Mongo(servers);
+        mongo.setReadPreference(ReadPreference.secondaryPreferred());
 
-            if( username != null ){
-                if( this.mongoDb.authenticate( username, password.toCharArray() ) == false ){
-                    throw new DataImportHandlerException( SEVERE
-                                                        , "Mongo Authentication Failed");
-                }
+        this.mongoConnection = mongo;
+        this.mongoDb = mongo.getDB( databaseName );
+
+        if( username != null ){
+            if( this.mongoDb.authenticate( username, password.toCharArray() ) == false ){
+                throw new DataImportHandlerException( SEVERE
+                                                    , "Mongo Authentication Failed");
             }
-
-        } catch ( UnknownHostException e ) {
-            throw new DataImportHandlerException( SEVERE
-                                                , "Unable to connect to Mongo");
         }
+
+
     }
 
     @Override
@@ -74,7 +81,7 @@ public class MongoDataSource extends DataSource<Iterator<Map<String, Object>>>{
 
         long start = System.currentTimeMillis();
         mongoCursor  = this.mongoCollection.find( queryObject );
-        LOG.trace("Time taken for mongo :"
+        LOG.info("Time taken for mongo :"
                 + (System.currentTimeMillis() - start));
 
         ResultSetIterator resultSet = new ResultSetIterator( mongoCursor );

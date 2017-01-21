@@ -11,7 +11,7 @@ Welcome to the Solr Mongo Importer project. This project provides MongoDb suppor
 
 * MongoDataSource - Provides a MongoDb datasource
     * database (**required**) - The name of the data base you want to connect to
-    * host     (*optional* - default: localhost)
+    * host     (*optional* - default: localhost array ex: "host1,host2,host3")
     * port     (*optional* - default: 27017)
     * username (*optional*)
     * password (*optional*)
